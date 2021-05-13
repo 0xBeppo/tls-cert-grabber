@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from logging import ERROR
+import logging
 from scapy.all import *
 from scapy.layers.tls.extensions import TLS_Ext_SupportedGroups, TLS_Ext_SupportedPointFormat, \
     TLS_Ext_SignatureAlgorithms, TLS_Ext_Heartbeat, TLS_Ext_Padding
@@ -10,7 +10,7 @@ from scapy.layers.tls.record import TLS
 import socket
 
 load_layer('tls')
-logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s :: %(levelname)s :: %(message)s')
 
 def get_tls_certificate(address, port):
     target = (address, port)
@@ -30,27 +30,38 @@ def get_tls_certificate(address, port):
              TLS_Ext_Heartbeat(heartbeat_mode=1),
              TLS_Ext_Padding(padding=212 * b'\x00')]))
 
+    tls_header = b'\x16\x03\x03'
+
     try:
         # TCP Socket
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect(target)
 
         # p.show()
-        print("sending TLS payload")
+        logging.info("sending TLS Client Hello")
         s.sendall(bytes(p))
         resp = s.recv(1024 * 8)
-
-        server_hello = TLS(resp)
+        if resp[:3] != tls_header:
+            logging.error("no Server Hello recived")
+            exit(1)
         # parse received data
-        server_hello.show()
+        logging.info("recived Server Hello")
+        server_hello = TLS(resp)
+        # get certificate from Server Hello Response
+        cert = server_hello.payload.msg[0].certs[0][1]
+        logging.info(cert)
+        name = cert.subject['commonName']
+        organization = cert.subject['organizationName']
+        logging.info(name)
+        logging.info(organization)
     except Exception as error:
-        print(f"Error ocurred: {error} ")
+        logging.error(f"Error ocurred: {error} ")
     finally:
         s.close()
 
 if __name__ == '__main__':
     if len(sys.argv) <= 2:
-        print("USAGE: <host> <port>")
+        logging.warning("USAGE: <host> <port>")
         exit(1)
     
     get_tls_certificate(sys.argv[1], int(sys.argv[2]))
