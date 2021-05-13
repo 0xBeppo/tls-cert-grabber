@@ -9,6 +9,7 @@ from scapy.layers.tls.handshake import TLSClientHello
 from scapy.layers.tls.record import TLS
 import socket
 
+load_layer('tls')
 logger = logging.getLogger(__name__)
 
 def get_tls_certificate(address, port):
@@ -34,14 +35,16 @@ def get_tls_certificate(address, port):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect(target)
 
-        p.show()
+        # p.show()
         print("sending TLS payload")
-        s.sendall(str(p))
+        s.sendall(bytes(p))
         resp = s.recv(1024 * 8)
+
+        server_hello = TLS(resp)
         # parse received data
-        print(resp)
-    except:
-        print("Error ocurred")
+        server_hello.show()
+    except Exception as error:
+        print(f"Error ocurred: {error} ")
     finally:
         s.close()
 
